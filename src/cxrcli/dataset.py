@@ -60,7 +60,7 @@ class CXRDataset(Dataset):
         """
         return len(self.df)
 
-    def __getitem__(self, idx: int) -> Dict[str, Any]:
+    def __getitem__(self, idx: int) -> dict:
         """
         Fetch a single sample by index.
 
@@ -80,13 +80,12 @@ class CXRDataset(Dataset):
         if self.transform:
             img = self.transform(img)
 
-        # Return a structured sample
-        # DataLoader will later collate multiple samples into a batch
         sample = {
-            "image": img,                       # image tensor (after transform)
-            "labels": row["Finding Labels"],    # raw label string (multi-label)
-            "patient_id": row["Patient ID"],    # patient-level identifier
+            "image": img,
+            "labels": row["Finding Labels"],
+            "patient_id": row["Patient ID"],
             "view_position": row.get("View Position", None),
+            "age": row.get("Patient Age", None),      # 追加
+            "gender": row.get("Patient Gender", None) # 追加（将来の tabular feature 用）
         }
-
         return sample
