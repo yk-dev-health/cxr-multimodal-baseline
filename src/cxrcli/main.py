@@ -14,13 +14,13 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from dataset import CXRDataset
+from preprocessing import encode_tabular_features
 
 def collate_fn(batch):
     images = torch.stack([b["image"] for b in batch])
-    tabs = torch.tensor([[float(b["age"]) if b["age"] else 0] for b in batch], dtype=torch.float32)
+    tabs = torch.stack([encode_tabular_features(b) for b in batch])
     labels = [b["labels"] for b in batch]
     return images, tabs, labels
-
 
 def main():
     # Paths to CSV metadata and image directory
