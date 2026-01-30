@@ -8,11 +8,16 @@ This script:
 - Encodes tabular features into numeric tensors
 - Batches data using a custom collate function
 - Runs a forward pass through a baseline fusion model
+- Saves predictions and evaluation metrics
 """
+
+import json
+from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
+
 from dataset import CXRDataset
 from preprocessing import encode_tabular_features
 from models import BaselineFusionModel
@@ -20,14 +25,6 @@ from models import BaselineFusionModel
 def collate_fn(batch):
     """
     Custom collate function to prepare batched model inputs.
-
-    Converts a list of dataset samples into:
-    - images: Tensor [B, C, H, W]
-    - tabular features: Tensor [B, F]
-    - labels: list[str]
-
-    This function defines the exact interface between
-    the dataset and the downstream model.
     """
     images = torch.stack([b["image"] for b in batch])
     tabular = torch.stack([encode_tabular_features(b) for b in batch])
@@ -36,10 +33,15 @@ def collate_fn(batch):
     return images, tabular, labels
 
 
-def main():
-    # Paths to CSV metadata and image directory
-    csv_path = "data/nih_cxr/Data_Entry_2017.csv"
-    image_dir = "data/nih_cxr/images/images_001"
+def main(csv_path="data/nih_cxr/Data_Entry_2017.csv",
+        image_dir="data/nih_cxr/images/images_001",
+        batch_size=16,
+        output_dir="outputs/"):
+    """
+    Main pipeline for CXR multimodal baseline.
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # Image preprocessing pipeline
     transform = transforms.Compose([
@@ -71,7 +73,7 @@ def main():
     # DataLoader with custom collate function
     loader = DataLoader(
         dataset,
-        batch_size=2,
+        batch_size=batch_size,
         shuffle=True,
         collate_fn=collate_fn
     )
@@ -87,17 +89,31 @@ def main():
     model.eval()  # inference mode for demonstration
 
     # Run a single forward pass for validation
+    all_predictions = []
+    all_labels = []
     for images, tabular, labels in loader:
-        print("\nFirst batch inspection:")
-        print("Batch image shape:", images.shape)
-        print("Batch tabular shape:", tabular.shape)
-        print("Batch labels:", labels)
-
         with torch.no_grad():
             outputs = model(images, tabular)
+            preds = outputs.argmax(dim=1).tolist()
+            all_predictions.extend(preds)
+            all_labels.extend(labels)
 
-        print("Model output shape:", outputs.shape)
-        break  # one batch is sufficient for validation
+    # Save predictions
+    pred_file = output_dir / "predictions.json"
+    with open(pred_file, "w") as f:
+        json.dump(all_predictions, f, indent=2)
+
+    # Example metrics (can be extended)
+    metrics = {
+        "num_samples": len(dataset),
+        "num_batches": len(loader)
+    }
+    metrics_file = output_dir / "metrics.json"
+    with open(metrics_file, "w") as f:
+        json.dump(metrics, f, indent=2)
+
+    print(f"\nPredictions saved → {pred_file}")
+    print(f"Metrics saved → {metrics_file}")
 
 
 if __name__ == "__main__":
